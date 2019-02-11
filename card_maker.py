@@ -2,7 +2,7 @@
 """
 Created on Tue Oct 30 11:32:35 2018
 
-@author: Andreas
+@author: Andreas Wagener
 """
 
 from PIL import Image
@@ -17,7 +17,7 @@ from pandas import read_excel, isnull
 import re
 from math import ceil
 import sys
-sys.path.append('C:\\Users\\Andreas\\Questimator\\Code\\Card_Size')
+sys.path.append('C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\HQ_Card_Maker')
 from HQRegex import HQRegex
 
 
@@ -25,14 +25,14 @@ DARKRED = (59,0,0)
 VANILLA = (245,236,219)
 COLORFORMAT = 'RGBA'
 
-BASEPATH = 'C:\\Users\\Andreas\\Questimator\\'
-TEMPLATEFOLDER = BASEPATH + 'Code\\Card_Size\\'
-FONTFOLDER = BASEPATH + 'Code\\Card_Size\\Fonts\\'
-PICPATH = BASEPATH + 'Code\\Card_Size\\Pics\\'
+BASEPATH = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\'
+TEMPLATEFOLDER = BASEPATH + 'input\\card_sizes\\'
+FONTFOLDER = BASEPATH + 'input\\fonts\\'
+PICPATH = BASEPATH + 'input\\pics\\'
 
-INPUT = BASEPATH + "input\\cardsize\\"
+INPUT = BASEPATH + "input\\"
 
-OUTPATH_BASE = BASEPATH + 'output\\cardsize\\'
+OUTPATH_BASE = BASEPATH + 'cards\\'
 OUTPATH_ONLINE = 'online\\'
 OUTPATH_PHONE = 'phone\\'
 OUTPATH_PRINT = 'print\\'
@@ -526,8 +526,8 @@ test_list = INPUT + "Test_Table.xlsx"
 cards = read_cards(anderas_allcards)
 clean_output_folder(OUTPATH_BASE)
 #make_cards(cards, use_specials = False, card_type = "potion")
-#make_cards(cards, use_specials = False, card_type = "defense")
+make_cards(cards, use_specials = False, card_type = "defense")
 #make_cards(cards, use_specials = False, card_type = "treasure")
-make_cards(cards, use_specials = False, card_type = "all")
+#make_cards(cards, use_specials = False, card_type = "all")
 make_preview(OUTPATH_BASE + 'us_en\\' + OUTPATH_PRINT)
 #make_preview(OUTPATH_BASE + 'eu_en\\' + OUTPATH_PHONE)

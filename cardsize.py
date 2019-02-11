@@ -5,10 +5,10 @@ Created on Sun Oct 28 04:57:49 2018
 @author: Andreas
 """
 
-inpath = 'C:\\Users\\Andreas\\Questimator\\input\\cardsize\\'
-outpath = 'C:\\Users\\Andreas\\Questimator\\output\\cardsize\\'
+inpath = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\input\\'
+outpath = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\cards\\'
 normal_card = '526 Reinforcements Undeads Rising.png'
-
+TEMPLATEFOLDER = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\input\\card_sizes\\'
 
 work_card = normal_card
 infile = inpath  + work_card
@@ -22,7 +22,7 @@ from os import path as ospath, curdir, makedirs, listdir, remove
 DARKRED = (59,0,0)
 VANILLA = (245,236,219)
 
-TEMPLATEFOLDER = 'C:\\Users\\Andreas\\Questimator\\Code\\Card_Size\\'
+
 
 POKERFRAME = TEMPLATEFOLDER + r'EU_Pokerframe.png'
 NORMALFRAME = TEMPLATEFOLDER + r'EU_Frame.png'
@@ -34,21 +34,23 @@ def verbose(in_str):
     if VERBOSITY > 0:
         print(in_str)
 
-def raw_bw_to_eu_test():
-    infile = r'C:\Users\Andreas\Questimator\input\cardsize\to_multiply\526 Reinforcements Undeads Rising.png'
-    framefile = r'C:\Users\Andreas\Questimator\input\cardsize\to_multiply\EU_Frame.png'
-    framefile = POKERFRAME
-    outfile = r'C:\Users\Andreas\Questimator\input\cardsize\to_multiply\505 Chaos Energy EU.png'
-    im = Image.open(infile)
-    raw_bw_card_to_useable(im, framefile, outfile)
 
 
-def work_on_eu_folder(in_path=None, out_path=None):
+def work_on_eu_folder(in_path=None,
+                      out_path_online=None,
+                      out_path_phone=None):
     if in_path == None:
-        in_path = 'C:\\Users\\Andreas\\Questimator\\input\\cardsize\\'
-    if out_path == None:
-        out_path_online = 'C:\\Users\\Andreas\\Questimator\\output\\cardsize\\online\\'
-        out_path_phone = 'C:\\Users\\Andreas\\Questimator\\output\\cardsize\\phone\\'
+        print('Error in module cardsize, function work_on_eu_folder')
+        print('no in_path was given')
+        return 0
+    if out_path_online == None:
+        print('Error in module cardsize, function work_on_eu_folder')
+        print('no out_path_online was given')
+        return 0
+    if out_path_phone == None:
+        print('Error in module cardsize, function work_on_eu_folder')
+        print('no out_path_phone was given')
+        return 0
     try:
         makedirs(in_path)
     except:
@@ -69,13 +71,26 @@ def work_on_eu_folder(in_path=None, out_path=None):
             im = Image.open(in_path + file)
             make_phone_online(im, out_phon, out_onl)
 
-def work_on_raw_eu_folder(in_path=None, out_path=None, card_format="zombicide"):
+def work_on_raw_eu_folder(in_path=None,
+                          out_path_online=None,
+                          out_path_phone=None,
+                          out_path_print=None,
+                          card_format="zombicide"):
     if in_path == None:
-        in_path = 'C:\\Users\\Andreas\\Questimator\\input\\cardsize\\to_multiply\\'
-    if out_path == None:
-        out_path_online = 'C:\\Users\\Andreas\\Questimator\\output\\cardsize\\online\\'
-        out_path_phone = 'C:\\Users\\Andreas\\Questimator\\output\\cardsize\\phone\\'
-        out_path_print = 'C:\\Users\\Andreas\\Questimator\\output\\cardsize\\print\\'
+        print('Error in module cardsize, function work_on_raw_eu_folder')
+        print('no in_path was given')
+        print('in the first version it had a name like "to_multiply"')
+        return 0
+        #in_path = 'C:\\Users\\Andreas\\Questimator\\input\\cardsize\\to_multiply\\'
+    if out_path_online == None:
+        print('Error in module cardsize, function work_on_raw_eu_folder')
+        print('no out_path_online was given')
+    if out_path_phone == None:
+        print('Error in module cardsize, function work_on_raw_eu_folder')
+        print('no out_path_phone was given')
+    if out_path_print == None:
+        print('Error in module cardsize, function work_on_raw_eu_folder')
+        print('no out_path_print was given')
     try:
         makedirs(in_path)
     except:

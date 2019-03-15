@@ -16,7 +16,7 @@ class HQRegex:
         self.reroll = r'(r\w*ll?s?\W*)'
         # search for: walrus, wallruss, black walrus, bunny, black bunny,
         # black bunnies, black shield
-        self.walrus = r'(((black\W*)?((w\w*s)|bunn?i?e?y?s?))|(black(\Ws\w*ds?))s?)'
+        self.walrus = r'(((black\W*)?((wal\w*s)|bunn?i?e?y?s?))|(black(\Ws\w*ds?))s?)'
         # captures shield, white shield, but not black shield
         self.shield = r'(white)?(?<!black)(\W?sh\w*lds?)'
         # captures skull, skulls, skullz.. .you name it

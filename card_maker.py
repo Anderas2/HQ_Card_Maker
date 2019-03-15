@@ -19,7 +19,7 @@ from math import ceil
 import sys
 sys.path.append('C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\HQ_Card_Maker')
 from HQRegex import HQRegex
-
+import multiprocessing as multi
 
 DARKRED = (59,0,0)
 VANILLA = (245,236,219)
@@ -48,9 +48,10 @@ BASE_CARD_SIZE = (567, 995)
 
 #%%
 # Todo List:
-# Read a CSV with cards and make a list of card dicts
-# make a picture frame, 4 pixel wide, around the center image
-
+# TODO: use pathlib for paths
+# TODO: parallelize card generation
+# TODO: Make special sign search more efficient
+# TODO: Hand, Head, Body, Feet as signs?
 
 
 
@@ -71,6 +72,8 @@ def read_cards(link = None):
     else:
         files = []
         files.append(link)
+
+
     for file in files:
         in_pd = read_excel(file)
         cards_raw = in_pd.to_dict(orient = 'records')
@@ -112,48 +115,56 @@ def read_cards(link = None):
             card['language'] = language
             card['tags'] = str(record['Tags']).lower()
             card['No'] = record['No']
-            cards.append(card)
+            cardbacks = record['card_back']
+            try:
+                for cardback in cardbacks:
+                    card['back'] = cardback
+                    cards.append(card)
+            except:
+                print(record)
+                print()
+                print(cardbacks)
+                raise TypeError
     return cards
 
 
 # example card for debugging
-card = {'language':
-            [{'language':'en',
-                "title":"Dazzling Gemstone!",
-                 "body":  "In a forgotten corner you find a dazzling jewel " +
-                    "worth 135 gold coins! Whenever you move, this gem " +
-                    "might draw your gaze to its splendor. \n"+
-                    "Discount any movement die rolled above your mind point total. " +
-                    "You may discard this card if both dice are doubles " +
-                    "and not discounted. \n" +
-                    "If you keep this card, mark the gold coins "+
-                    "on your sheet after the Quest and "+
-                    "return it to the deck.",
-                "formats":['eu', 'us'],
-                },
-            {'language':'de',
-                "title":"Schillernder Edelstein",
-                 "body":"In einer vergessenen Ecke findest Du ein schillerndes " +
-                   "Juwel im Wert von 135 Gold! "
-                   "Wenn du dich bewegst, zieht das Juwel den Blick auf "+
-                   "seine Pracht.\n Entferne jeden Bewegungswürfel der mehr "+
-                   "Augen zeigt als du ♦ hast. Du darfst diese " +
-                   "Karte abwerfen, wenn du einen Pasch würfelst. \n"+
-                   "Wenn du die Karte behältst, schreibe dir das Gold am Ende " +
-                   "der Quest auf.",
-               "formats":['eu'],
-              }
-            ],
-       "pic_id": "Gemstone",
-       "pic_path": PICPATH + "Gemstone.png" ,
-       }
-cards = []
-cards.append(card)
+#card = {'language':
+#            [{'language':'en',
+#                "title":"Dazzling Gemstone!",
+#                 "body":  "In a forgotten corner you find a dazzling jewel " +
+#                    "worth 135 gold coins! Whenever you move, this gem " +
+#                    "might draw your gaze to its splendor. \n"+
+#                    "Discount any movement die rolled above your mind point total. " +
+#                    "You may discard this card if both dice are doubles " +
+#                    "and not discounted. \n" +
+#                    "If you keep this card, mark the gold coins "+
+#                    "on your sheet after the Quest and "+
+#                    "return it to the deck.",
+#                "formats":['eu', 'us'],
+#                },
+#            {'language':'de',
+#                "title":"Schillernder Edelstein",
+#                 "body":"In einer vergessenen Ecke findest Du ein schillerndes " +
+#                   "Juwel im Wert von 135 Gold! "
+#                   "Wenn du dich bewegst, zieht das Juwel den Blick auf "+
+#                   "seine Pracht.\n Entferne jeden Bewegungswürfel der mehr "+
+#                   "Augen zeigt als du ♦ hast. Du darfst diese " +
+#                   "Karte abwerfen, wenn du einen Pasch würfelst. \n"+
+#                   "Wenn du die Karte behältst, schreibe dir das Gold am Ende " +
+#                   "der Quest auf.",
+#               "formats":['eu'],
+#              }
+#            ],
+#       "pic_id": "Gemstone",
+#       "pic_path": PICPATH + "Gemstone.png" ,
+#       }
+#cards = []
+#cards.append(card)
 
 #%%
 
 def use_specialsigns(in_str, short_signlist = True, language = 'en'):
-    in_str = card['language'][0]['body']
     hq_words = HQRegex(country = language)
     # comment, regex, sign as usable in HQModern font, color of the sign
     special_signs = [['Mind Point', re.compile(hq_words.mp, re.I|re.M), '♦', (0,0,255)],
@@ -182,6 +193,9 @@ def use_specialsigns(in_str, short_signlist = True, language = 'en'):
 
 #%%
 def make_headline(msg, im=None, style="eu"):
+    ''' Changes font type fitting to the format defined in "style" (eu or us);
+    then makes the headline and centers it. If it is too big, it will be made
+    smaller to fit the card.'''
     size = 60
     for i in range(0, 31, 1):
         if style == "us":
@@ -213,12 +227,25 @@ def wrap_text_on_card(in_text,
                       maxwidth = 38, # text width in letters
                       maxheight = 13 # text height in lines
                       ):
+    ''' Gets a text in_text and splits it into lines to fit the defined margins
+    maxwidth is the maximum number of letters per line. It will be adjusted from
+    outside.
+    maxheight is the maximum number of lines for this text space.
+        maxheight is currently not used.
+
+
+    returns a list of text lines.
+    '''
+    # first, split into lines by newlines coming from the text
     new_msg = re.split('\n', in_text)
-#    new_msg = in_text
+
+    # now split the rest fitting to the space restrictions
     lines = []
     for line in new_msg:
         lines.append(textwrap.wrap(line, width=maxwidth, replace_whitespace = False))
-#    messages = textwrap.wrap(in_text, width = maxwidth, replace_whitespace=False)
+
+    # special signs and newlines are not treated very well by the textwrap
+    # function, so I treat them well now.
     messages = []
     for sublist in lines:
         if len(sublist) == 0:
@@ -234,6 +261,11 @@ def wrap_text_on_card(in_text,
 
 #%%
 def replace_specials(msg, signs):
+    ''' unfinished function to implement the special signs of HQ Modern.
+    The dream is to have certain symbols replaced, like the ever-repeating
+    sentence "Discard this card".
+    '''
+    # TODO: Finish this function and implement it!
     for sign in signs:
             msg = msg.replace(sign, signs[sign])
     return msg
@@ -244,23 +276,38 @@ def make_text_body(msg="Empty Card",
               textcolor='black',
               use_specials = True,
               language = 'en'):
+    ''' Makes the text body for a play card.
+    msg: The text that shall be on the playcard.
+    im: An input image that can be used as size restriction for the text
+    textcolor: you can define any color here. default is black.
+    use_specials: shall the special signs of hq_modern be used or not.
+    language: The text can be in different languages. This is important for
+        the regexes that replace repeating sentences with special signs.
 
-    # maxwidth = 38 for fontsize = 32
-    # maxwidth = 34 for fontsize = 38
-    maxletters = [33, 38]
-    fontsizes = [38, 32]
-    pads = [8, 5, 4] # minimum distance between two lines in pixel
+    returns: An image of the text fitting with the dimensions of the input
+        image.
+    '''
+
+    # sanity checks
+    if im == None:
+        im = Image.new(COLORFORMAT, TEXTFRAME_SIZE, VANILLA)
+    draw = ImageDraw.Draw(im)
 
     if use_specials == True:
         msg, sign_colors = use_specialsigns(msg, language=language)
     else:
         sign_colors = {'♦':(0,0,255),
                        '♥':(255,0,0)}
-    if im == None:
-        im = Image.new(COLORFORMAT, TEXTFRAME_SIZE, VANILLA)
-    draw = ImageDraw.Draw(im)
 
-    # measure text size and check if it works
+
+
+    # check the text size and see if it works with the im restrictions
+    # if not, switch to smaller padding and/or smaller font size.
+    # maxwidth = 38 for fontsize = 32
+    # maxwidth = 34 for fontsize = 38
+    maxletters = [33, 38] # maxiumum number of letters per line
+    fontsizes = [38, 32] # fontsize to be used
+    pads = [8, 5, 4] # minimum distance between two lines in pixel
     for i, fontsize in enumerate(fontsizes):
         maxwidth =  maxletters[i]
         if language == 'de':
@@ -289,9 +336,10 @@ def make_text_body(msg="Empty Card",
         if text_h < im_h:
             break
 
-    # vertically centered starting position
+    # Make vertically centered starting position
     current_h = (im_h - text_h) // 2
 
+    # now, line by line, make texts
     for line in msg_lines:
         # check if colored special signs appear in the line.
         # every text part will have a color property.
@@ -324,8 +372,12 @@ def make_text_body(msg="Empty Card",
         # every part has it's assigned color now.
         # print it along the line, part for part
         # check text size for center positioning
+        # Text size should be good now.
+
+        # determine start for horizontally centered text
         t_w, t_h = draw.textsize(line, font=font)
-        start_w_pos = (im_w - t_w) // 2 # determine start for centered text
+        start_w_pos = (im_w - t_w) // 2
+
         current_w = start_w_pos
         for textpart in textparts:
             t_w, t_h = draw.textsize(textpart['text'],
@@ -341,8 +393,9 @@ def make_text_body(msg="Empty Card",
 #%%
 
 def open_image(pic_path, pic_size):
-    '''if the image exists, opens the image. Otherwise, makes an image
-    of pic_size with an error message inside'''
+    '''if the image exists, opens the image and make it fitting to pic_size.
+    Otherwise, makes an image of pic_size with an error message inside
+    '''
     try:
         im = Image.open(pic_path)
     except:
@@ -354,6 +407,7 @@ def make_picture(pic_path, pic_size = None, bgcolor = None):
         pic_size = PICFRAME_SIZE
     if bgcolor == None:
         bgcolor = 'white'
+    # make a new background image in the right size
     bg_im = Image.new(COLORFORMAT, pic_size, 'black')
 
     s_w, s_h = bg_im.size
@@ -390,8 +444,11 @@ def make_picture(pic_path, pic_size = None, bgcolor = None):
         crop_h = 0
     im = im.crop((crop_w, crop_h, i_w - crop_w, i_h -crop_h))
     i_w, i_h = im.size # probably resized, so we need to ask for the size again.
+
+    # position the image i in the center of the background image bg
     bg_w, bg_h = bg_im.size
     offset = ((bg_w - i_w) // 2, (bg_h - i_h) // 2)
+    # and paste it on top of the background
     bg_im.paste(im, offset)
     bg_im
     return bg_im
@@ -399,6 +456,12 @@ def make_picture(pic_path, pic_size = None, bgcolor = None):
 
 #%%
 def make_base_card(card, style = "eu", use_specials=True):
+    ''' gets the dict that defines one card;
+    makes headline, picture and text body;
+    pastes everything together; applies vanilla - darkred colors,
+    returns everything as image.
+    '''
+
     im_head = make_headline(card['title'], style = style)
     im_pic = make_picture(card["pic_path"])
     im_body = make_text_body(card['body'],
@@ -420,7 +483,7 @@ def make_base_card(card, style = "eu", use_specials=True):
     bg_im.paste(im_pic, offset)
 
     # apply "aged" colors to black and white card
-    # choose darker colors to make white appear vanilla colored
+    # multiply with vanilla colors to make white appear vanilla colored
     vanillalayer = Image.new('RGBA', bg_im.size, VANILLA)
     bg_im = ImageChops.multiply(bg_im, vanillalayer)
     #bg_im = ImageChops.darker(bg_im, vanillalayer)
@@ -439,6 +502,19 @@ def make_base_card(card, style = "eu", use_specials=True):
     offset = ((bg_w - i_w) // 2, (bg_h - i_body_h) )
     bg_im.paste(im_body, offset)
     return bg_im
+
+def make_a_card(card):
+    im = make_base_card(card,
+                        style=card['cardformat'],
+                        use_specials=card['use_specials'])
+
+    im = cardsize.card_sizing(im, fmt=card['cardformat'])
+
+    cardsize.save_png(im, card['out_print'])
+
+    cardsize.make_phone_online(im, card['out_phon'],
+                                   card['out_onl'])
+
 #%%
 
 def make_folder(path):
@@ -448,28 +524,85 @@ def make_folder(path):
         pass
     return path
 
-def make_cards(cards, use_specials = True, card_type = 'all'):
+def make_card_list(cards, use_specials = True, card_type = 'all', clean = True):
+
+    card_list = []
+    # make list of cards in simplified format. One list entry = one card
     for card in cards:
         for language in card['language']:
             for cardformat in language['formats']:
                 if (card_type == 'all'
-                or card_type.lower() in card['tags']):
+                or card_type.lower() in card['tags'].lower()):
                     this_card = {}
+                    this_card['use_specials'] = use_specials
+                    this_card['cardformat'] = cardformat
                     this_card['title'] = language['title']
                     this_card['body'] = language['body']
                     this_card['pic_path'] = card['pic_path']
                     this_card['language'] = language['language']
-                    card_name = str(card['No'])[:-2] + ' ' + language['title']
+                    if '.' in str(card['No']):
+                        nr = str(int(card['No']))
+                    else:
+                        nr = str(card['No'])
+                    this_card['name'] = nr + ' ' + language['title'] + ' ' + card['tags']
+                    this_card['out_base'] = OUTPATH_BASE + cardformat + '_' + language['language'] + '\\'
+                    this_card['out_phon'] = make_folder(this_card['out_base'] + OUTPATH_PHONE) +  this_card['name'] + '.jpg'
+                    this_card['out_onl'] = make_folder(this_card['out_base'] + OUTPATH_ONLINE) + this_card['name'] + '.jpg'
+                    this_card['out_print'] = make_folder(this_card['out_base'] + OUTPATH_PRINT) + this_card['name'] + '.png'
+                    card_list.append(this_card)
+    return card_list
 
-                    out_base = OUTPATH_BASE + cardformat + '_' + language['language'] + '\\'
-                    out_phon = make_folder(out_base + OUTPATH_PHONE) +  card_name + '.jpg'
-                    out_onl = make_folder(out_base + OUTPATH_ONLINE) + card_name + '.jpg'
-                    out_print = make_folder(out_base + OUTPATH_PRINT) + card_name + '.png'
 
-                    im = make_base_card(this_card, style=cardformat, use_specials=use_specials)
-                    im = cardsize.card_sizing(im, fmt=cardformat)
-                    cardsize.save_png(im, out_print)
-                    cardsize.make_phone_online(im, out_phon, out_onl)
+#%%
+def make_cards_from_list(card_list, mult = False):
+    if not mult:
+        [make_a_card(card) for card in card_list]
+    else:
+
+        p = multi.Pool(processes = 3)
+        p.map_async(make_a_card, card_list, chunksize = 20)
+        p.close
+        p.join
+
+
+def make_cards(cards, use_specials = True, card_type = 'all', clean = True,
+               multiprocessor = True):
+    if clean:
+        clean_output_folder(OUTPATH_BASE)
+    card_list = make_card_list(cards,
+                               use_specials = use_specials,
+                               card_type = card_type,
+                               clean = clean)
+    make_cards_from_list(card_list, mult = multiprocessor)
+#def make_cards(cards, use_specials = True, card_type = 'all', clean = True):
+#    if clean:
+#        clean_output_folder(OUTPATH_BASE)
+#
+#    for card in cards:
+#        for language in card['language']:
+#            for cardformat in language['formats']:
+#                if (card_type == 'all'
+#                or card_type.lower() in card['tags'].lower()):
+#                    this_card = {}
+#                    this_card['title'] = language['title']
+#                    this_card['body'] = language['body']
+#                    this_card['pic_path'] = card['pic_path']
+#                    this_card['language'] = language['language']
+#                    if '.' in str(card['No']):
+#                        nr = str(int(card['No']))
+#                    else:
+#                        nr = str(card['No'])
+#                    card_name = nr + ' ' + language['title'] + ' ' + card['tags']
+#
+#                    out_base = OUTPATH_BASE + cardformat + '_' + language['language'] + '\\'
+#                    out_phon = make_folder(out_base + OUTPATH_PHONE) +  card_name + '.jpg'
+#                    out_onl = make_folder(out_base + OUTPATH_ONLINE) + card_name + '.jpg'
+#                    out_print = make_folder(out_base + OUTPATH_PRINT) + card_name + '.png'
+#
+#                    im = make_base_card(this_card, style=cardformat, use_specials=use_specials)
+#                    im = cardsize.card_sizing(im, fmt=cardformat)
+#                    cardsize.save_png(im, out_print)
+#                    cardsize.make_phone_online(im, out_phon, out_onl)
 #%%
 def make_preview(folder_path):
     if path.isfile(folder_path + 'preview.jpg'):
@@ -513,21 +646,28 @@ def clean_output_folder(path):
             print(e)
 
 #%%
-hq25_swampspell = "https://docs.google.com/spreadsheets/d/1omrpqC8eupy4G2DD4zW7vaci68kGg6o0L4vBlTZeOOU/export?format=xlsx"
-hq25_treasure = "https://docs.google.com/spreadsheets/d/1-ZABwdSaDR6dZLPAzyCFdsj6XlzRCwQRtW-_TLWG1os/export?format=xlsx"
-hq25_artifacts = "https://docs.google.com/spreadsheets/d/14ygpowS7sQ521ykDj7nA0gileswH-6BO3lkBPjsVI2c/export?format=xlsx"
-hq25_koboldspell = "https://docs.google.com/spreadsheets/d/1oJxs1JpDD171nNeJnRtgKI0ni-n9Sz6I6HmbgmICpsI/export?format=xlsx"
 
-anderas_allcards = "https://docs.google.com/spreadsheets/d/1qQq0dLraUhs6_WnAGd2meji5QS2sDg1hW_OOCnE3Km8/export?format=xlsx"
 
-test_list = INPUT + "Test_Table.xlsx"
+if __name__ == '__main__':
+    multi.freeze_support()
+    hq25_swampspell = "https://docs.google.com/spreadsheets/d/1omrpqC8eupy4G2DD4zW7vaci68kGg6o0L4vBlTZeOOU/export?format=xlsx"
+    hq25_treasure = "https://docs.google.com/spreadsheets/d/1-ZABwdSaDR6dZLPAzyCFdsj6XlzRCwQRtW-_TLWG1os/export?format=xlsx"
+    hq25_artifacts = "https://docs.google.com/spreadsheets/d/14ygpowS7sQ521ykDj7nA0gileswH-6BO3lkBPjsVI2c/export?format=xlsx"
+    hq25_koboldspell = "https://docs.google.com/spreadsheets/d/1oJxs1JpDD171nNeJnRtgKI0ni-n9Sz6I6HmbgmICpsI/export?format=xlsx"
 
-#cards = read_cards(hq25_koboldspell)
-cards = read_cards(anderas_allcards)
-clean_output_folder(OUTPATH_BASE)
-#make_cards(cards, use_specials = False, card_type = "potion")
-make_cards(cards, use_specials = False, card_type = "defense")
-#make_cards(cards, use_specials = False, card_type = "treasure")
-#make_cards(cards, use_specials = False, card_type = "all")
-make_preview(OUTPATH_BASE + 'us_en\\' + OUTPATH_PRINT)
-#make_preview(OUTPATH_BASE + 'eu_en\\' + OUTPATH_PHONE)
+    anderas_allcards = "https://docs.google.com/spreadsheets/d/1qQq0dLraUhs6_WnAGd2meji5QS2sDg1hW_OOCnE3Km8/export?format=xlsx"
+
+    test_list = INPUT + "Test_Table.xlsx"
+
+    #cards = read_cards(hq25_koboldspell)
+    cards = read_cards(anderas_allcards)
+
+    #make_cards(cards, use_specials = False, card_type = "potion")
+    make_cards(cards, use_specials = False, card_type = "all", clean = True,
+               multiprocessor = True)
+    #make_cards(cards, use_specials = False, card_type = "treasure")
+    #make_cards(cards, use_specials = False, card_type = "all")
+
+
+    #make_preview(OUTPATH_BASE + 'eu_en\\' + OUTPATH_PHONE)
+    #make_preview(OUTPATH_BASE + 'us_en\\' + OUTPATH_PRINT)

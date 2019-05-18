@@ -5,263 +5,301 @@ Created on Sun Oct 28 04:57:49 2018
 @author: Andreas
 """
 
-inpath = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\input\\'
-outpath = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\cards\\'
-normal_card = '526 Reinforcements Undeads Rising.png'
-TEMPLATEFOLDER = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\input\\card_sizes\\'
-
-work_card = normal_card
-infile = inpath  + work_card
-outfile = outpath + work_card[:-3] + 'jpg'
-
 from PIL import Image
 from PIL import ImageChops
-from PIL import ImageDraw
-from os import path as ospath, curdir, makedirs, listdir, remove
+#from PIL import ImageDraw
+from os import makedirs, listdir
 
-DARKRED = (59,0,0)
-VANILLA = (245,236,219)
-
-
-
-POKERFRAME = TEMPLATEFOLDER + r'EU_Pokerframe.png'
-NORMALFRAME = TEMPLATEFOLDER + r'EU_Frame.png'
-HEADLINE = TEMPLATEFOLDER + r'headline_space.png'
-HEADLINE_SIZE = (561, 96)
-
-VERBOSITY = 0
-def verbose(in_str):
-    if VERBOSITY > 0:
-        print(in_str)
+# TODO: Make online and phone versions working for US cards
+# TODO: make round corners for online version (transparency?)
 
 
+class cardsize():
+    def __init__(self):
+        self.inpath = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\input\\'
+        self.outpath = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\cards\\'
+        self.normal_card = '526 Reinforcements Undeads Rising.png'
+        self.TEMPLATEFOLDER = 'C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\input\\card_sizes\\'
 
-def work_on_eu_folder(in_path=None,
+        self.work_card = self.normal_card
+        self.infile = self.inpath  + self.work_card
+        self.outfile = self.outpath + self.work_card[:-3] + 'jpg'
+
+        self.darkred = (59,0,0)
+        self.vanilla = (245,236,219)
+
+        self.POKERFRAME = self.TEMPLATEFOLDER + r'EU_Pokerframe.png'
+        self.NORMALFRAME = self.TEMPLATEFOLDER + r'EU_Frame.png'
+        self.HEADLINE = self.TEMPLATEFOLDER + r'headline_space.png'
+        self.HEADLINE_SIZE = (561, 96)
+
+        self.VERBOSITY = 0
+        def verbose(self, in_str):
+            if self.VERBOSITY > 0:
+                print(in_str)
+
+    def check_folders(self,
+                      in_path=None,
                       out_path_online=None,
                       out_path_phone=None):
-    if in_path == None:
-        print('Error in module cardsize, function work_on_eu_folder')
-        print('no in_path was given')
-        return 0
-    if out_path_online == None:
-        print('Error in module cardsize, function work_on_eu_folder')
-        print('no out_path_online was given')
-        return 0
-    if out_path_phone == None:
-        print('Error in module cardsize, function work_on_eu_folder')
-        print('no out_path_phone was given')
-        return 0
-    try:
-        makedirs(in_path)
-    except:
-        pass
-    try:
-        makedirs(out_path_online)
-    except:
-        pass
-    try:
-        makedirs(out_path_phone)
-    except:
-        pass
+        ''' checks if the given folders exist and if not, generates them.
+        '''
+        if in_path == None:
+            print('Error in module cardsize, function work_on_eu_folder')
+            print('no in_path was given')
+            return 0
+        if out_path_online == None:
+            print('Error in module cardsize, function work_on_eu_folder')
+            print('no out_path_online was given')
+            return 0
+        if out_path_phone == None:
+            print('Error in module cardsize, function work_on_eu_folder')
+            print('no out_path_phone was given')
+            return 0
+        try:
+            makedirs(in_path)
+        except:
+            pass
+        try:
+            makedirs(out_path_online)
+        except:
+            pass
+        try:
+            makedirs(out_path_phone)
+        except:
+            pass
 
-    for file in listdir(in_path):
-        if file.endswith(".png"):
-            out_phon = out_path_phone + file[:-3] + 'jpg'
-            out_onl = out_path_online + file[:-3] + 'jpg'
-            im = Image.open(in_path + file)
-            make_phone_online(im, out_phon, out_onl)
-
-def work_on_raw_eu_folder(in_path=None,
+    def work_on_eu_folder(self,
+                          in_path=None,
                           out_path_online=None,
-                          out_path_phone=None,
-                          out_path_print=None,
-                          card_format="zombicide"):
-    if in_path == None:
-        print('Error in module cardsize, function work_on_raw_eu_folder')
-        print('no in_path was given')
-        print('in the first version it had a name like "to_multiply"')
-        return 0
-        #in_path = 'C:\\Users\\Andreas\\Questimator\\input\\cardsize\\to_multiply\\'
-    if out_path_online == None:
-        print('Error in module cardsize, function work_on_raw_eu_folder')
-        print('no out_path_online was given')
-    if out_path_phone == None:
-        print('Error in module cardsize, function work_on_raw_eu_folder')
-        print('no out_path_phone was given')
-    if out_path_print == None:
-        print('Error in module cardsize, function work_on_raw_eu_folder')
-        print('no out_path_print was given')
-    try:
-        makedirs(in_path)
-    except:
-        pass
-    try:
-        makedirs(out_path_online)
-    except:
-        pass
-    try:
-        makedirs(out_path_phone)
-    except:
-        pass
-    try:
-        makedirs(out_path_print)
-    except:
-        pass
+                          out_path_phone=None):
+        ''' Checks the paths that were given. If they do not exist yet,
+        they are made.
+        Then it crops the printer versions down to phone and online
+            versions of each picture found in the in_path.
 
-    for file in listdir(in_path):
-        if file.endswith(".png"):
-            out_phon = out_path_phone + file[:-3] + 'jpg'
-            out_onl = out_path_online + file[:-3] + 'jpg'
-            im = Image.open(in_path + file)
-            im = card_sizing(im, card_format)
-            out_print = out_path_print + file[:-3] + 'png'
-            save_png(im, out_print)
-            make_phone_online(im, out_phon, out_onl)
+        in_path: Folder containing images
+        out_path_online: Target folder to save online format cards to
+        out_path_phone: Target folder to save phone format cards to
+        '''
+        self.check_folders(in_path, out_path_online, out_path_phone)
 
-def make_phone_online(im, out_phon, out_onl):
+        for file in listdir(in_path):
+            if file.endswith(".png"):
+                im = Image.open(in_path + file)
 
-    mob_im = card_to_mobilephone(im)
-    save_jpg(mob_im, out_phon)
+                out_phon = out_path_phone + file[:-3] + 'jpg'
+                out_onl = out_path_online + file[:-3] + 'jpg'
+                self.make_phone_online(im, out_phon, out_onl)
 
-    online_im = card_to_forum(im, out_onl)
-    save_jpg(online_im, out_onl)
+    def work_on_raw_eu_folder(self,
+                              in_path=None,
+                              out_path_online=None,
+                              out_path_phone=None,
+                              out_path_print=None,
+                              card_format="zombicide"):
+        ''' Checks the paths that were given. If they do not exist yet,
+        they are made.
 
+        First adjust the size of the card pictures to some format defined
+            with the NORMALFRAME attribute
+        Then it crops the printer versions down to phone and online
+            versions of each picture found in the in_path.
 
-def save_jpg(im, outfile):
-    darkred = (59,0,0)
-    background = Image.new('RGBA', im.size, darkred)
-    if im.mode == "RGB":
-        im = im.convert('RGBA')
-    new_png = Image.alpha_composite(background, im)
-    out_png = Image.new('RGB', im.size, (59,0,0))
-    out_png.paste(new_png, mask=new_png.split()[3])
-    out_png.save(outfile, fmt="jpeg", quality = 80)
+        in_path: Folder containing images
+        out_path_online: Target folder to save online format cards to
+        out_path_phone: Target folder to save phone format cards to
+        '''
+        self.check_folders(in_path, out_path_online, out_path_phone)
+        # additional check of print path
+        if out_path_print == None:
+            print('Error in module cardsize, function work_on_raw_eu_folder')
+            print('no out_path_print was given')
+        try:
+            makedirs(out_path_print)
+        except:
+            pass
 
-def save_png(im, outfile):
-    darkred = (59,0,0)
-    background = Image.new('RGBA', im.size, darkred)
-    if im.mode == "RGB":
-        im = im.convert('RGBA')
-    new_png = Image.alpha_composite(background, im)
-    out_png = Image.new('RGB', im.size, (59,0,0))
-    out_png.paste(new_png, mask=new_png.split()[3])
-    out_png.save(outfile)
+        for file in listdir(in_path):
+            if file.endswith(".png"):
+                im = Image.open(in_path + file)
 
-def card_sizing(im, fmt=None):
-    '''return a darkred image having the img in exact center;
-    adapted to fit for 783 x 1146 images of Heroquest Cards;
-    brings them to a format suitable for the smallest Printerstudio size
-    with cards of 44x67 mm.'''
+                im = self.card_sizing(im, card_format)
+                out_print = out_path_print + file[:-3] + 'png'
+                self.save_png(im, out_print)
 
-    size = im.size
-    frame_f = NORMALFRAME
+                out_phon = out_path_phone + file[:-3] + 'jpg'
+                out_onl = out_path_online + file[:-3] + 'jpg'
+                self.make_phone_online(im, out_phon, out_onl)
 
-    if fmt != None:
-        fmt = fmt.lower()
-        if fmt in ["zombicide", "44x67", "eu"]:
-            size = (830, 1196)
-            frame_f = NORMALFRAME
-        elif fmt == "us":
-            size = (725, 1094)
-            frame_f = None
-        elif fmt == "25x35" or fmt == "poker":
-            '2,5 x 3,5 inch format'
-            size = (822, 1122) # advertised for by Printerstudio
-            size = (852, 1222) # works better with printestudio
-            frame_f = POKERFRAME
-        elif fmt == "agressive_test":
-            size = (460, 400)
+    def make_phone_online(self,
+                          im, out_phon, out_onl):
+        ''' Uses the supersized printer card format and makes
+        two card formats: One that is best for mobile phones: No borders.
+        One that is good for online presentation: Normal card border, compressed image format.
+        Then saves it in jpg to save disk space
 
-    # resize image by stuffing to the borders or crop
-    im_sized = Image.new('RGBA', size, VANILLA)
-    s_w, s_h = im_sized.size
-    im_w, im_h = im.size
-    offset = ((s_w - im_w) // 2, (s_h - im_h) // 2)
-    im_sized.paste(im, offset) # paste image in the middle of the new card
+        im: Card image to treat in PIL format
 
-    # If a frame was chosen, apply frame.
-    if frame_f != None:
-        frame = Image.open(frame_f) #load frame
-        # get sizes to paste the frame in the middle.
-        f_w, f_h = frame.size
-        im_w, im_h = im_sized.size
-        offset = ((im_w - f_w) // 2, (im_h - f_h) // 2)
-        # The frame is black on the outside and white on the inside.
-        # So I make a new black picture and paste the new frame on top
-        layer = Image.new('RGBA', im_sized.size, DARKRED)
-        #layer = ImageChops.lighter(layer, frame)
-        layer.paste(frame, offset)
-        layer = ImageChops.lighter(layer, Image.new('RGBA', im_sized.size, DARKRED))
-        # and paste the original in the middle, take only the darker colors
-        im_sized = ImageChops.darker(im_sized, layer)
+        out_phon: folder to save phone format playcards to
 
-    return im_sized
+        out_onl: folder to save online format playcards to
+        '''
+
+        mob_im = self.card_to_mobilephone(im)
+        self.save_jpg(mob_im, out_phon)
+
+        online_im = self.card_to_forum(im, out_onl)
+        self.save_jpg(online_im, out_onl)
 
 
+    def save_convert(self, im):
+        background = Image.new('RGBA', im.size, self.darkred)
+        if im.mode == "RGB":
+            im = im.convert('RGBA')
+        new_png = Image.alpha_composite(background, im)
+        out_png = Image.new('RGB', im.size, self.darkred)
+        out_png.paste(new_png, mask=new_png.split()[3])
+        return out_png
 
-def raw_bw_card_to_useable(im, framefile=None, us=False):
-    ''' needs exact same card sizes of framefile and im.
-    if us, no frame will be applied. The rest is same-ish.
-    '''
-    if us == False:
-        if framefile == None:
-            framefile = NORMALFRAME
-        frame = Image.open(framefile)
-        f_w, f_h = frame.size
+    def save_jpg(self, im, outfile):
+        ''' failsafe function to save a file as jpg.
+        PIL has some problems with combining RGB and RGBA pictures, so they
+        are converted back and forth before saving.
+        '''
+        out_png = self.save_convert(im)
+        #background = Image.new('RGBA', im.size, self.darkred)
+        #if im.mode == "RGB":
+        #    im = im.convert('RGBA')
+        #new_png = Image.alpha_composite(background, im)
+        #out_png = Image.new('RGB', im.size, self.darkred)
+        #out_png.paste(new_png, mask=new_png.split()[3])
+        out_png.save(outfile, fmt="jpeg", quality = 80)
+
+    def save_png(self, im, outfile):
+        out_png = self.save_convert(im)
+
+        #background = Image.new('RGBA', im.size, self.darkred)
+        #if im.mode == "RGB":
+        #    im = im.convert('RGBA')
+        #new_png = Image.alpha_composite(background, im)
+        #out_png = Image.new('RGB', im.size, self.darkred)
+        #out_png.paste(new_png, mask=new_png.split()[3])
+        out_png.save(outfile)
+
+    def card_sizing(self, im, fmt=None):
+        '''return a darkred image having the img in exact center;
+        adapted to fit for 783 x 1146 images of Heroquest Cards;
+        brings them to a format suitable for some Printerstudio sizes.'''
+
+        size = im.size
+        frame_f = self.NORMALFRAME
+
+        if fmt != None:
+            fmt = fmt.lower()
+            if fmt in ["zombicide", "44x67", "eu"]:
+                size = (830, 1196)
+                frame_f = self.NORMALFRAME
+            elif fmt == "us":
+                size = (725, 1094)
+                frame_f = None
+            elif fmt == "25x35" or fmt == "poker":
+                '2,5 x 3,5 inch format'
+                size = (852, 1222) # works better with printestudio
+                frame_f = self.POKERFRAME
+            elif fmt == "agressive_test":
+                size = (460, 400)
+
+        # resize image by stuffing to the borders or crop
+        im_sized = Image.new('RGBA', size, self.vanilla)
+        s_w, s_h = im_sized.size
         im_w, im_h = im.size
-        offset = ((im_w - f_w) // 2, (im_h - f_h) // 2)
-        layer = Image.new('RGBA', im.size, (255, 255, 255))
-        layer.paste(frame, offset)
+        offset = ((s_w - im_w) // 2, (s_h - im_h) // 2)
+        im_sized.paste(im, offset) # paste image in the middle of the new card
 
-        im = ImageChops.darker(im, layer)
+        # If a frame was chosen, apply frame.
+        if frame_f != None:
+            frame = Image.open(frame_f) #load frame
+            # get sizes to paste the frame in the middle.
+            f_w, f_h = frame.size
+            im_w, im_h = im_sized.size
+            offset = ((im_w - f_w) // 2, (im_h - f_h) // 2)
+            # The frame is black on the outside and white on the inside.
+            # So I make a new black picture and paste the new frame on top
+            layer = Image.new('RGBA', im_sized.size, self.darkred)
+            #layer = ImageChops.lighter(layer, frame)
+            layer.paste(frame, offset)
+            layer = ImageChops.lighter(layer, Image.new('RGBA', im_sized.size, self.darkred))
+            # and paste the original in the middle, take only the darker colors
+            im_sized = ImageChops.darker(im_sized, layer)
 
-    darkred = (59,0,0)
-    vanilla = (245,236,219)
-    # multiplication to change white areas to vanilla color
-    vanillalayer = Image.new('RGBA', im.size, vanilla)
-    im = ImageChops.darker(im, vanillalayer)
-
-    # choose lighter color to change the dark areas to darkred
-    darkredlayer = Image.new('RGBA', im.size, darkred)
-
-    im = ImageChops.lighter(im, darkredlayer)
-
-    return im
+        return im_sized
 
 
 
+    def raw_bw_card_to_useable(self, im, framefile=None, us=False):
+        ''' needs exact same card sizes of framefile and im.
+        if us, no frame will be applied. The rest is same-ish.
+        '''
+        if us == False:
+            if framefile == None:
+                framefile = self.NORMALFRAME
+            frame = Image.open(framefile)
+            f_w, f_h = frame.size
+            im_w, im_h = im.size
+            offset = ((im_w - f_w) // 2, (im_h - f_h) // 2)
+            layer = Image.new('RGBA', im.size, (255, 255, 255))
+            layer.paste(frame, offset)
 
-def card_to_mobilephone(im):
-    '''takes any card and removes printer stripes all around'''
-    return trim(im)
+            im = ImageChops.darker(im, layer)
 
-def card_to_forum(im, outfile):
-    '''takes any card and removes printer stripes all around'''
-    return trim_half(im)
 
-def trim(im):
-    '''removes a border around an image '''
-    bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
-    diff = ImageChops.difference(im, bg)
-    diff = ImageChops.add(diff, diff, 2.0, -100)
-    bbox = diff.getbbox()
-    if bbox:
-        bbox = tuple([bbox[0]-2, bbox[1]-2, bbox[2]+2, bbox[3]+2])
-        return im.crop(bbox)
-    else: return im
+        # multiplication to change white areas to vanilla color
+        vanillalayer = Image.new('RGBA', im.size, self.vanilla)
+        im = ImageChops.darker(im, vanillalayer)
 
-def trim_half(im):
-    ''' returns half the border around an image '''
-    bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
-    diff = ImageChops.difference(im, bg)
-    diff = ImageChops.add(diff, diff, 2.0, -100)
-    bbox = diff.getbbox()
-    if bbox:
-        bbox = tuple([int(bbox[0]/2),
-                      int(bbox[1]/2),
-                      int(im.size[0]/2 + bbox[2]/2),
-                      int(im.size[1]/2 + bbox[3]/2)
-                          ])
-        return im.crop(bbox)
-    else: return im
+        # choose lighter color to change the dark areas to darkred
+        darkredlayer = Image.new('RGBA', im.size, self.darkred)
+        im = ImageChops.lighter(im, darkredlayer)
+
+        return im
+
+
+
+
+    def card_to_mobilephone(self, im):
+        '''takes any card and removes printer stripes all around'''
+        return self.trim(im)
+
+    def card_to_forum(self, im, outfile):
+        '''takes any card and removes printer stripes all around'''
+        return self.trim_half(im)
+
+    def trim(self, im):
+        '''removes a border around an image '''
+        bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
+        diff = ImageChops.difference(im, bg)
+        diff = ImageChops.add(diff, diff, 2.0, -100)
+        # TODO: Works not with the US format
+        bbox = diff.getbbox()
+        if bbox:
+            bbox = tuple([bbox[0]-2, bbox[1]-2, bbox[2]+2, bbox[3]+2])
+            return im.crop(bbox)
+        else: return im
+
+    def trim_half(self, im):
+        ''' returns half the border around an image '''
+        bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
+        diff = ImageChops.difference(im, bg)
+        diff = ImageChops.add(diff, diff, 2.0, -100)
+        # TODO: Works not in the US format
+        bbox = diff.getbbox()
+        if bbox:
+            bbox = tuple([int(bbox[0]/2),
+                          int(bbox[1]/2),
+                          int(im.size[0]/2 + bbox[2]/2),
+                          int(im.size[1]/2 + bbox[3]/2)
+                              ])
+            return im.crop(bbox)
+        else: return im
 

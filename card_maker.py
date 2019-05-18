@@ -49,7 +49,7 @@ BASE_CARD_SIZE = (567, 995)
 #%%
 # Todo List:
 # TODO: use pathlib for paths
-# TODO: parallelize card generation
+
 # TODO: Make special sign search more efficient
 # TODO: Hand, Head, Body, Feet as signs?
 
@@ -70,12 +70,15 @@ def read_cards(link = None):
             if file.endswith(".xlsx"):
                 files.append(INPUT + file)
     else:
+        if r"edit?usp=sharing" in link:
+            link = link.replace(r"edit?usp=sharing", "export?format=xlsx")
         files = []
         files.append(link)
 
 
     for file in files:
         in_pd = read_excel(file)
+        in_pd = in_pd[isnull(in_pd["title_en"])==False]
         cards_raw = in_pd.to_dict(orient = 'records')
         language_versions = []
         for key in cards_raw[0].keys():
@@ -128,39 +131,7 @@ def read_cards(link = None):
     return cards
 
 
-# example card for debugging
-#card = {'language':
-#            [{'language':'en',
-#                "title":"Dazzling Gemstone!",
-#                 "body":  "In a forgotten corner you find a dazzling jewel " +
-#                    "worth 135 gold coins! Whenever you move, this gem " +
-#                    "might draw your gaze to its splendor. \n"+
-#                    "Discount any movement die rolled above your mind point total. " +
-#                    "You may discard this card if both dice are doubles " +
-#                    "and not discounted. \n" +
-#                    "If you keep this card, mark the gold coins "+
-#                    "on your sheet after the Quest and "+
-#                    "return it to the deck.",
-#                "formats":['eu', 'us'],
-#                },
-#            {'language':'de',
-#                "title":"Schillernder Edelstein",
-#                 "body":"In einer vergessenen Ecke findest Du ein schillerndes " +
-#                   "Juwel im Wert von 135 Gold! "
-#                   "Wenn du dich bewegst, zieht das Juwel den Blick auf "+
-#                   "seine Pracht.\n Entferne jeden Bewegungswürfel der mehr "+
-#                   "Augen zeigt als du ♦ hast. Du darfst diese " +
-#                   "Karte abwerfen, wenn du einen Pasch würfelst. \n"+
-#                   "Wenn du die Karte behältst, schreibe dir das Gold am Ende " +
-#                   "der Quest auf.",
-#               "formats":['eu'],
-#              }
-#            ],
-#       "pic_id": "Gemstone",
-#       "pic_path": PICPATH + "Gemstone.png" ,
-#       }
-#cards = []
-#cards.append(card)
+
 
 #%%
 
@@ -504,16 +475,19 @@ def make_base_card(card, style = "eu", use_specials=True):
     return bg_im
 
 def make_a_card(card):
+    ''' Generates one card. Advantage: By having it separated card by card,
+    it should be parallelizable theoretically.
+    '''
     im = make_base_card(card,
                         style=card['cardformat'],
                         use_specials=card['use_specials'])
+    cs = cardsize.cardsize()
+    im = cs.card_sizing(im, fmt=card['cardformat'])
+    cs.save_png(im, card['out_print'])
 
-    im = cardsize.card_sizing(im, fmt=card['cardformat'])
+    cs.make_phone_online(im, card['out_phon'],
+                               card['out_onl'])
 
-    cardsize.save_png(im, card['out_print'])
-
-    cardsize.make_phone_online(im, card['out_phon'],
-                                   card['out_onl'])
 
 #%%
 
@@ -555,14 +529,20 @@ def make_card_list(cards, use_specials = True, card_type = 'all', clean = True):
 
 #%%
 def make_cards_from_list(card_list, mult = False):
+    ''' generates cards from the card list. Important about this function:
+        The switch between normal processing and multiprocessing is taking
+        place here.
+    '''
     if not mult:
         [make_a_card(card) for card in card_list]
     else:
 
         p = multi.Pool(processes = 3)
-        p.map_async(make_a_card, card_list, chunksize = 20)
+        p.map(make_a_card, card_list, chunksize = 20)
         p.close
         p.join
+
+
 
 
 def make_cards(cards, use_specials = True, card_type = 'all', clean = True,
@@ -574,35 +554,7 @@ def make_cards(cards, use_specials = True, card_type = 'all', clean = True,
                                card_type = card_type,
                                clean = clean)
     make_cards_from_list(card_list, mult = multiprocessor)
-#def make_cards(cards, use_specials = True, card_type = 'all', clean = True):
-#    if clean:
-#        clean_output_folder(OUTPATH_BASE)
-#
-#    for card in cards:
-#        for language in card['language']:
-#            for cardformat in language['formats']:
-#                if (card_type == 'all'
-#                or card_type.lower() in card['tags'].lower()):
-#                    this_card = {}
-#                    this_card['title'] = language['title']
-#                    this_card['body'] = language['body']
-#                    this_card['pic_path'] = card['pic_path']
-#                    this_card['language'] = language['language']
-#                    if '.' in str(card['No']):
-#                        nr = str(int(card['No']))
-#                    else:
-#                        nr = str(card['No'])
-#                    card_name = nr + ' ' + language['title'] + ' ' + card['tags']
-#
-#                    out_base = OUTPATH_BASE + cardformat + '_' + language['language'] + '\\'
-#                    out_phon = make_folder(out_base + OUTPATH_PHONE) +  card_name + '.jpg'
-#                    out_onl = make_folder(out_base + OUTPATH_ONLINE) + card_name + '.jpg'
-#                    out_print = make_folder(out_base + OUTPATH_PRINT) + card_name + '.png'
-#
-#                    im = make_base_card(this_card, style=cardformat, use_specials=use_specials)
-#                    im = cardsize.card_sizing(im, fmt=cardformat)
-#                    cardsize.save_png(im, out_print)
-#                    cardsize.make_phone_online(im, out_phon, out_onl)
+
 #%%
 def make_preview(folder_path):
     if path.isfile(folder_path + 'preview.jpg'):
@@ -665,6 +617,7 @@ if __name__ == '__main__':
     #make_cards(cards, use_specials = False, card_type = "potion")
     make_cards(cards, use_specials = False, card_type = "all", clean = True,
                multiprocessor = True)
+    #make_cards(cards, use_specials = False, card_type = "change", clean = False)
     #make_cards(cards, use_specials = False, card_type = "treasure")
     #make_cards(cards, use_specials = False, card_type = "all")
 

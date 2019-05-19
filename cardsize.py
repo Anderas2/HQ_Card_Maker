@@ -12,6 +12,7 @@ from os import makedirs, listdir
 
 # TODO: Make online and phone versions working for US cards
 # TODO: make round corners for online version (transparency?)
+# TODO: Accept (x,y) millimeters as input?
 
 
 class cardsize():
@@ -133,7 +134,9 @@ class cardsize():
                 self.make_phone_online(im, out_phon, out_onl)
 
     def make_phone_online(self,
-                          im, out_phon, out_onl):
+                          im,
+                          out_phon = None,
+                          out_onl = None):
         ''' Uses the supersized printer card format and makes
         two card formats: One that is best for mobile phones: No borders.
         One that is good for online presentation: Normal card border, compressed image format.
@@ -145,12 +148,12 @@ class cardsize():
 
         out_onl: folder to save online format playcards to
         '''
-
-        mob_im = self.card_to_mobilephone(im)
-        self.save_jpg(mob_im, out_phon)
-
-        online_im = self.card_to_forum(im, out_onl)
-        self.save_jpg(online_im, out_onl)
+        if out_phon:
+            mob_im = self.card_to_mobilephone(im)
+            self.save_jpg(mob_im, out_phon)
+        if out_onl:
+            online_im = self.card_to_forum(im, out_onl)
+            self.save_jpg(online_im, out_onl)
 
 
     def save_convert(self, im):

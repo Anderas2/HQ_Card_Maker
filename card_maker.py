@@ -20,6 +20,7 @@ import sys
 sys.path.append('C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\HQ_Card_Maker')
 from HQRegex import HQRegex
 import multiprocessing as multi
+from pathlib import Path
 
 DARKRED = (59,0,0)
 VANILLA = (245,236,219)
@@ -105,20 +106,30 @@ def read_cards(link = None):
             language = []
             for version in language_versions:
                 # version contains "de", "en", "fr", "it" and so on
+                # TODO: change format to actual card size format
                 content = {'language': version,
                            'title': record['title_'+version],
                            'body': record['body_'+version],
-                           'formats':['eu']
+                           'formats':['eu'],
+                           'style':['eu']
                            }
                 if version == 'en':
                     content['formats'].append('us')
+                    content['style'].append('us')
                 if not (isnull(content['title'])
                 or isnull(content['body'])):
                     language.append(content)
             card['language'] = language
             card['tags'] = str(record['Tags']).lower()
             card['No'] = record['No']
-            cardbacks = record['card_back']
+            # splits card backs by comma, filters empty strings away
+            cardbacks = list(filter(None, record['card_back'].split(",")))
+#            try:
+#                cardbacks = list(filter("", cardbacks))
+#            except:
+#                print(cardbacks)
+#                print(card)
+#                raise
             try:
                 for cardback in cardbacks:
                     card['back'] = cardback
@@ -477,16 +488,26 @@ def make_base_card(card, style = "eu", use_specials=True):
 def make_a_card(card):
     ''' Generates one card. Advantage: By having it separated card by card,
     it should be parallelizable theoretically.
+    cardformat can be:
+        1. "zombicide", "44x67", "eu" (all the same effect)
+        2. "us"
+        3. "25x35" or "poker"
+    TODO: the style (eu or us) should be separate from the
+    cut format in card_sizing!
+
     '''
     im = make_base_card(card,
                         style=card['cardformat'],
                         use_specials=card['use_specials'])
     cs = cardsize.cardsize()
     im = cs.card_sizing(im, fmt=card['cardformat'])
-    cs.save_png(im, card['out_print'])
+    if 'out_print' in card:
+        cs.save_png(im, card['out_print'])
+    if 'out_phon' in card:
+        cs.make_phone_online(im, out_phon = card['out_phon'])
+    if 'out_onl' in card:
+        cs.make_phone_online(im, out_onl = card['out_onl'])
 
-    cs.make_phone_online(im, card['out_phon'],
-                               card['out_onl'])
 
 
 #%%
@@ -498,18 +519,29 @@ def make_folder(path):
         pass
     return path
 
+def make_folders(card_list):
+    folders = set()
+    for variant in ['out_phon','out_onl','out_print']:
+        for card in card_list:
+            if variant in card:
+                path = Path(card[variant])
+                folders.add(str(path.parent))
+    for folder in folders:
+        make_folder(folder)
+
 def make_card_list(cards, use_specials = True, card_type = 'all', clean = True):
 
     card_list = []
     # make list of cards in simplified format. One list entry = one card
     for card in cards:
         for language in card['language']:
-            for cardformat in language['formats']:
+            for style in language['style']:
                 if (card_type == 'all'
                 or card_type.lower() in card['tags'].lower()):
                     this_card = {}
                     this_card['use_specials'] = use_specials
-                    this_card['cardformat'] = cardformat
+                    this_card['style'] = style
+                    this_card['cardformat'] = style # TODO: Change to actual format
                     this_card['title'] = language['title']
                     this_card['body'] = language['body']
                     this_card['pic_path'] = card['pic_path']
@@ -519,10 +551,12 @@ def make_card_list(cards, use_specials = True, card_type = 'all', clean = True):
                     else:
                         nr = str(card['No'])
                     this_card['name'] = nr + ' ' + language['title'] + ' ' + card['tags']
-                    this_card['out_base'] = OUTPATH_BASE + cardformat + '_' + language['language'] + '\\'
-                    this_card['out_phon'] = make_folder(this_card['out_base'] + OUTPATH_PHONE) +  this_card['name'] + '.jpg'
-                    this_card['out_onl'] = make_folder(this_card['out_base'] + OUTPATH_ONLINE) + this_card['name'] + '.jpg'
-                    this_card['out_print'] = make_folder(this_card['out_base'] + OUTPATH_PRINT) + this_card['name'] + '.png'
+                    this_card['out_base'] = OUTPATH_BASE + style + '_' + language['language'] + '\\'
+                    this_card['out_phon'] = this_card['out_base'] + OUTPATH_PHONE + card['back'] + '\\' +  this_card['name'] + '.jpg'
+                    this_card['out_onl'] = this_card['out_base'] + OUTPATH_ONLINE + card['back'] + '\\' + this_card['name'] + '.jpg'
+                    this_card['out_print'] = this_card['out_base'] + OUTPATH_PRINT + card['back'] + '\\' + this_card['name'] + '.png'
+
+                    this_card['card_back'] = card['back']
                     card_list.append(this_card)
     return card_list
 
@@ -543,16 +577,88 @@ def make_cards_from_list(card_list, mult = False):
         p.join
 
 
+def filter_by_folder(folder_list, card_list):
+    if not isinstance(folder_list, list):
+        folder_list = [folder_list]
+    poplist = []
+    new_card_list = []
+    if not "out_phon" in folder_list:
+        poplist.append("out_phon")
+    if not "out_onl" in folder_list:
+        poplist.append("out_onl")
+    if not "out_print" in folder_list:
+        poplist.append("out_print")
+    for card in card_list:
+        for folder in poplist:
+            card.pop(folder)
+        new_card_list.append(card)
+    return new_card_list
+
+
+def filter_by_language(lan_list, card_list):
+    if not isinstance(lan_list, list):
+        lan_list = [lan_list]
+
+    new_card_list = []
+    for card in card_list:
+        if card["language"] in lan_list:
+            new_card_list.append(card)
+    return new_card_list
+
+
+def filter_by_back(back_list, card_list):
+    if not isinstance(back_list, list):
+        back_list = [back_list]
+
+    new_card_list = []
+    for card in card_list:
+        if card['card_back'] in back_list:
+            new_card_list.append(card)
+    return new_card_list
+
+
+def filter_by_style(style_list, card_list):
+    if not isinstance(style_list, list):
+        style_list = [style_list]
+
+    new_card_list = []
+    for card in card_list:
+        if card['style'] in style_list:
+            new_card_list.append(card)
+    return new_card_list
 
 
 def make_cards(cards, use_specials = True, card_type = 'all', clean = True,
-               multiprocessor = True):
+               multiprocessor = True, formatfilter = None):
+    '''
+    formatfilter contains a dict of lists with filters to be allowed.
+    {"folders":["out_phon", "out_onl", "out_print"]
+    "languages":["de", "en", "us"]
+    "card_backs":["artifact", "treasure"... ]all you can find in the list.
+    "style": ["eu", "us"]}
+    '''
     if clean:
         clean_output_folder(OUTPATH_BASE)
     card_list = make_card_list(cards,
                                use_specials = use_specials,
                                card_type = card_type,
                                clean = clean)
+    if formatfilter and "folders" in formatfilter:
+        card_list = filter_by_folder(folder_list = formatfilter["folders"],
+                                     card_list = card_list)
+    if formatfilter and "languages" in formatfilter:
+        card_list = filter_by_language(lan_list = formatfilter["languages"],
+                                     card_list = card_list)
+    if formatfilter and "card_backs" in formatfilter:
+        card_list = filter_by_back(back_list = formatfilter["card_backs"],
+                                     card_list = card_list)
+    if formatfilter and "style" in formatfilter:
+        card_list = filter_by_style(style_list = formatfilter["style"],
+                                     card_list = card_list)
+
+    make_folders(card_list)
+
+
     make_cards_from_list(card_list, mult = multiprocessor)
 
 #%%
@@ -616,7 +722,11 @@ if __name__ == '__main__':
 
     #make_cards(cards, use_specials = False, card_type = "potion")
     make_cards(cards, use_specials = False, card_type = "all", clean = True,
-               multiprocessor = True)
+               multiprocessor = True, formatfilter = {"folders": "out_print",
+                                                      "languages": ["de", "en"],
+                                                      "style": "eu"
+                                                      }
+               )
     #make_cards(cards, use_specials = False, card_type = "change", clean = False)
     #make_cards(cards, use_specials = False, card_type = "treasure")
     #make_cards(cards, use_specials = False, card_type = "all")

@@ -21,6 +21,7 @@ sys.path.append('C:\\Users\\Andreas\\25 Heroquest\\HQ_Card_Maker\\HQ_Card_Maker'
 from HQRegex import HQRegex
 import multiprocessing as multi
 from pathlib import Path
+hex(219)
 
 DARKRED = (59,0,0)
 VANILLA = (245,236,219)
@@ -123,13 +124,8 @@ def read_cards(link = None):
             card['tags'] = str(record['Tags']).lower()
             card['No'] = record['No']
             # splits card backs by comma, filters empty strings away
-            cardbacks = list(filter(None, record['card_back'].split(",")))
-#            try:
-#                cardbacks = list(filter("", cardbacks))
-#            except:
-#                print(cardbacks)
-#                print(card)
-#                raise
+            back = record['card_back'].replace(" ", "")
+            cardbacks = list(filter(None, back.split(",")))
             try:
                 for cardback in cardbacks:
                     card['back'] = cardback
@@ -138,7 +134,7 @@ def read_cards(link = None):
                 print(record)
                 print()
                 print(cardbacks)
-                raise TypeError
+                raise
     return cards
 
 
@@ -489,25 +485,26 @@ def make_a_card(card):
     ''' Generates one card. Advantage: By having it separated card by card,
     it should be parallelizable theoretically.
     cardformat can be:
-        1. "zombicide", "44x67", "eu" (all the same effect)
-        2. "us"
-        3. "25x35" or "poker"
+        ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"]
     TODO: the style (eu or us) should be separate from the
     cut format in card_sizing!
 
     '''
-    im = make_base_card(card,
-                        style=card['cardformat'],
-                        use_specials=card['use_specials'])
-    cs = cardsize.cardsize()
-    im = cs.card_sizing(im, fmt=card['cardformat'])
-    if 'out_print' in card:
-        cs.save_png(im, card['out_print'])
-    if 'out_phon' in card:
-        cs.make_phone_online(im, out_phon = card['out_phon'])
-    if 'out_onl' in card:
-        cs.make_phone_online(im, out_onl = card['out_onl'])
-
+    try:
+        im = make_base_card(card,
+                            style=card['style'],
+                            use_specials=card['use_specials'])
+        cs = cardsize.cardsize()
+        im = cs.card_sizing(im, fmt=card['cardformat'])
+        if 'out_print' in card:
+            cs.save_png(im, card['out_print'])
+        if 'out_phon' in card:
+            cs.make_phone_online(im, out_phon = card['out_phon'])
+        if 'out_onl' in card:
+            cs.make_phone_online(im, out_onl = card['out_onl'])
+    except:
+        print(card)
+        raise
 
 
 #%%
@@ -529,7 +526,7 @@ def make_folders(card_list):
     for folder in folders:
         make_folder(folder)
 
-def make_card_list(cards, use_specials = True, card_type = 'all', clean = True):
+def make_card_list(cards, use_specials = True, card_type = 'all', clean = True, cardformat = "eu"):
 
     card_list = []
     # make list of cards in simplified format. One list entry = one card
@@ -541,7 +538,7 @@ def make_card_list(cards, use_specials = True, card_type = 'all', clean = True):
                     this_card = {}
                     this_card['use_specials'] = use_specials
                     this_card['style'] = style
-                    this_card['cardformat'] = style # TODO: Change to actual format
+                    this_card['cardformat'] = cardformat # TODO: Change to actual format
                     this_card['title'] = language['title']
                     this_card['body'] = language['body']
                     this_card['pic_path'] = card['pic_path']
@@ -571,7 +568,7 @@ def make_cards_from_list(card_list, mult = False):
         [make_a_card(card) for card in card_list]
     else:
 
-        p = multi.Pool(processes = 3)
+        p = multi.Pool()
         p.map(make_a_card, card_list, chunksize = 20)
         p.close
         p.join
@@ -629,7 +626,7 @@ def filter_by_style(style_list, card_list):
 
 
 def make_cards(cards, use_specials = True, card_type = 'all', clean = True,
-               multiprocessor = True, formatfilter = None):
+               multiprocessor = True, formatfilter = None, cardformat = "eu"):
     '''
     formatfilter contains a dict of lists with filters to be allowed.
     {"folders":["out_phon", "out_onl", "out_print"]
@@ -642,7 +639,8 @@ def make_cards(cards, use_specials = True, card_type = 'all', clean = True,
     card_list = make_card_list(cards,
                                use_specials = use_specials,
                                card_type = card_type,
-                               clean = clean)
+                               clean = clean,
+                               cardformat = cardformat)
     if formatfilter and "folders" in formatfilter:
         card_list = filter_by_folder(folder_list = formatfilter["folders"],
                                      card_list = card_list)
@@ -719,14 +717,30 @@ if __name__ == '__main__':
 
     #cards = read_cards(hq25_koboldspell)
     cards = read_cards(anderas_allcards)
+    '''    formatfilter contains a dict of lists with filters to be allowed.
+    {"folders":["out_phon", "out_onl", "out_print"]
+    "languages":["de", "en", "us"]
+    "card_backs":["artifact", "treasure"... ]all you can find in the list.
+    "style": ["eu", "us"]}'''
 
+    '''
+    cardformat can be one of these:
+        ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"] '''
     #make_cards(cards, use_specials = False, card_type = "potion")
-    make_cards(cards, use_specials = False, card_type = "all", clean = True,
-               multiprocessor = True, formatfilter = {"folders": "out_print",
-                                                      "languages": ["de", "en"],
-                                                      "style": "eu"
-                                                      }
+    make_cards(cards, use_specials = False, card_type = "spell", clean = False,
+               multiprocessor = True, formatfilter = {"folders": "out_onl",
+                                                      "languages": ["en"],
+                                                      "style": "us"
+                                                      },
+               cardformat = "us"
                )
+#    make_cards(cards, use_specials = False, card_type = "air spell", clean = False,
+#               multiprocessor = True, formatfilter = {"folders": "out_onl",
+#                                                      "languages": ["de"],
+#                                                      "style": "eu"
+#                                                      }
+#               )
+
     #make_cards(cards, use_specials = False, card_type = "change", clean = False)
     #make_cards(cards, use_specials = False, card_type = "treasure")
     #make_cards(cards, use_specials = False, card_type = "all")

@@ -192,26 +192,48 @@ class cardsize():
 
     def card_sizing(self, im, fmt=None):
         '''return a darkred image having the img in exact center;
-        adapted to fit for 783 x 1146 images of Heroquest Cards;
-        brings them to a format suitable for some Printerstudio sizes.'''
+        adapted to fit images of Heroquest Cards;
+        brings them to a format suitable for some Printerstudio sizes
+        by adding a 70 pixel border all around. 70 pixel is 2x3mm which
+        will be cut off by the professional printer'''
+
 
         size = im.size
         frame_f = self.NORMALFRAME
-
+        # original eu card size in mm
+        x = 53.7
+        y = 80
         if fmt != None:
             fmt = fmt.lower()
-            if fmt in ["zombicide", "44x67", "eu"]:
-                size = (830, 1196)
+            if fmt in ["zombicide", "44x67"]:
+                x = 44
+                y = 67
                 frame_f = self.NORMALFRAME
             elif fmt == "us":
-                size = (725, 1094)
+                #56mm x 89 mm
+                x = 56
+                y = 89
                 frame_f = None
-            elif fmt == "25x35" or fmt == "poker":
+            elif (fmt == "25x35") or ("poker" in fmt.lower()):
                 '2,5 x 3,5 inch format'
-                size = (852, 1222) # works better with printestudio
+                x = 63.5
+                y = 89
                 frame_f = self.POKERFRAME
             elif fmt == "agressive_test":
                 size = (460, 400)
+            elif "mini" in fmt.lower():
+                x = 44.5
+                y = 63.5
+            elif "skat" in fmt.lower():
+                x = 59
+                y = 91
+            else:
+                # none of those special formats found, assume original cards
+                x = 53.7
+                y = 80
+        testsize = (int(x / 25.4 * 300), int(y / 25.4 * 300))
+        size = (int(x / 25.4 * 300) + 70, int(y / 25.4 * 300) + 70)
+
 
         # resize image by stuffing to the borders or crop
         im_sized = Image.new('RGBA', size, self.vanilla)
@@ -291,18 +313,22 @@ class cardsize():
         else: return im
 
     def trim_half(self, im):
-        ''' returns half the border around an image '''
-        bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
-        diff = ImageChops.difference(im, bg)
-        diff = ImageChops.add(diff, diff, 2.0, -100)
+        ''' returns half the border around an image.
+        The print-security border should be 70 pixel all around,
+        that's 3mm of the picture and 3mm which are cut off,
+        so in total 6 mm times 300 dpi.'''
+        #bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
+        #diff = ImageChops.difference(im, bg)
+        #diff = ImageChops.add(diff, diff, 2.0, -100)
         # TODO: Works not in the US format
-        bbox = diff.getbbox()
-        if bbox:
-            bbox = tuple([int(bbox[0]/2),
-                          int(bbox[1]/2),
-                          int(im.size[0]/2 + bbox[2]/2),
-                          int(im.size[1]/2 + bbox[3]/2)
-                              ])
-            return im.crop(bbox)
-        else: return im
+        bbox = (35, 35, im.size[0]-35, im.size[1]-35)
+        #bbox = diff.getbbox()
+        #if bbox:
+        #    bbox = tuple([int(bbox[0]/2),
+        #                  int(bbox[1]/2),
+        #                  int(im.size[0]/2 + bbox[2]/2),
+        #                  int(im.size[1]/2 + bbox[3]/2)
+        #                      ])
+        return im.crop(bbox)
+        #else: return im
 

@@ -203,13 +203,15 @@ def make_headline(msg, im=None, style="eu"):
 #%%
 def wrap_text_on_card(in_text,
                       maxwidth = 38, # text width in letters
-                      maxheight = 13 # text height in lines
+                      maxheight = 13, # text height in lines
+                      im_w = 567 # image width in pixel
                       ):
     ''' Gets a text in_text and splits it into lines to fit the defined margins
     maxwidth is the maximum number of letters per line. It will be adjusted from
     outside.
     maxheight is the maximum number of lines for this text space.
         maxheight is currently not used.
+    im_w is the number of pixels that the image is wide.
 
 
     returns a list of text lines.
@@ -220,7 +222,10 @@ def wrap_text_on_card(in_text,
     # now split the rest fitting to the space restrictions
     lines = []
     for line in new_msg:
-        lines.append(textwrap.wrap(line, width=maxwidth, replace_whitespace = False))
+        line = textwrap.wrap(line, width=maxwidth, replace_whitespace = False)
+        lines.append(line)
+    # TODO: Textwrap does not do a good job when it comes to compare text
+    # length and image width. Correct.
 
     # special signs and newlines are not treated very well by the textwrap
     # function, so I treat them well now.
@@ -251,12 +256,15 @@ def replace_specials(msg, signs):
 
 def make_text_body(msg="Empty Card",
               im=None,
+              textsize = None,
               textcolor='black',
               use_specials = True,
               language = 'en'):
     ''' Makes the text body for a play card.
     msg: The text that shall be on the playcard.
     im: An input image that can be used as size restriction for the text
+    textsize: instead of handing an image as size, you can hand a size tuple
+    directly with (width, height) in pixel.
     textcolor: you can define any color here. default is black.
     use_specials: shall the special signs of hq_modern be used or not.
     language: The text can be in different languages. This is important for
@@ -268,7 +276,12 @@ def make_text_body(msg="Empty Card",
 
     # sanity checks
     if im == None:
-        im = Image.new(COLORFORMAT, TEXTFRAME_SIZE, VANILLA)
+        if textsize == None:
+            im = Image.new(COLORFORMAT, TEXTFRAME_SIZE, VANILLA)
+        else:
+            im = Image.new(COLORFORMAT, textsize, VANILLA)
+
+
     draw = ImageDraw.Draw(im)
 
     if use_specials == True:
@@ -286,6 +299,7 @@ def make_text_body(msg="Empty Card",
     maxletters = [33, 38] # maxiumum number of letters per line
     fontsizes = [38, 32] # fontsize to be used
     pads = [8, 5, 4] # minimum distance between two lines in pixel
+    im_w, im_h = im.size
     for i, fontsize in enumerate(fontsizes):
         maxwidth =  maxletters[i]
         if language == 'de':
@@ -294,9 +308,9 @@ def make_text_body(msg="Empty Card",
             maxwidth = maxwidth - 2
 
         for pad in pads:
-            msg_lines = wrap_text_on_card(msg, maxwidth = maxwidth)
+            msg_lines = wrap_text_on_card(msg, maxwidth = maxwidth, im_w = im_w)
             font = ImageFont.truetype(FONTFOLDER + "HQModern.ttf", fontsize)
-            im_w, im_h = im.size
+
             line_h = 0
             for line in msg_lines:
                 t_w, t_h = draw.textsize(line, font=font) # get the height
@@ -433,29 +447,46 @@ def make_picture(pic_path, pic_size = None, bgcolor = None):
 
 
 #%%
-def make_base_card(card, style = "eu", use_specials=True):
+def make_base_card(card, style = "eu", cardsize = None, use_specials=True):
     ''' gets the dict that defines one card;
     makes headline, picture and text body;
     pastes everything together; applies vanilla - darkred colors,
     returns everything as image.
     '''
+    if cardsize:
+        # if a card size was given, treat it as relative size compared to the
+        # original. Picture width is the way to determine the "real" size
+        #picture_width_px = 500
+        #picture_width_percent = 0.8818
+        #headline_height_percent = 0.09648
+
+        ratio_change = cardsize[0]/cardsize[1] - BASE_CARD_SIZE[0]/BASE_CARD_SIZE[1]
+        textsize = (TEXTFRAME_SIZE[0] + int(2. * TEXTFRAME_SIZE[0] * ratio_change),
+                    TEXTFRAME_SIZE[1])
+
+    else:
+        textsize = TEXTFRAME_SIZE
 
     im_head = make_headline(card['title'], style = style)
     im_pic = make_picture(card["pic_path"])
     im_body = make_text_body(card['body'],
+                             textsize = textsize,
                              use_specials=use_specials,
                              language = card['language'],
                              textcolor = DARKRED)
 
     #BASE_CARD_SIZE = (567, 995)
-    bg_im = Image.new(COLORFORMAT, BASE_CARD_SIZE, 'white')
-
+    w = max(BASE_CARD_SIZE[0], textsize[0])
+    bg_size = (w, BASE_CARD_SIZE[1])
+    bg_im = Image.new(COLORFORMAT, bg_size, 'white')
     bg_w, bg_h = bg_im.size
 
+    # paste headline
     i_w, i_head_h = im_head.size
     offset = ((bg_w - i_w) // 2, 0)
     bg_im.paste(im_head, offset)
 
+    # paste image
     i_w, i_pic_h = im_pic.size
     offset = ((bg_w - i_w) // 2, i_head_h-5 )
     bg_im.paste(im_pic, offset)
@@ -486,16 +517,21 @@ def make_a_card(card):
     it should be parallelizable theoretically.
     cardformat can be:
         ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"]
-    TODO: the style (eu or us) should be separate from the
-    cut format in card_sizing!
 
     '''
     try:
+        cs = cardsize.cardsize()
+        size = cs.card_sizing(fmt = card['cardformat'])
+
+        # TODO: Use size info to make ratio,
+        # especially make text frame wider or not depending on card size
+
         im = make_base_card(card,
                             style=card['style'],
+                            cardsize = size,
                             use_specials=card['use_specials'])
-        cs = cardsize.cardsize()
-        im = cs.card_sizing(im, fmt=card['cardformat'])
+
+        im = cs.card_sizing(im, fmt = card['cardformat'], style = card['style'])
         if 'out_print' in card:
             cs.save_png(im, card['out_print'])
         if 'out_phon' in card:
@@ -727,12 +763,12 @@ if __name__ == '__main__':
     cardformat can be one of these:
         ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"] '''
     #make_cards(cards, use_specials = False, card_type = "potion")
-    make_cards(cards, use_specials = False, card_type = "spell", clean = False,
-               multiprocessor = True, formatfilter = {"folders": "out_onl",
-                                                      "languages": ["en"],
-                                                      "style": "us"
+    make_cards(cards, use_specials = False, card_type = "dungeonsdark", clean = False,
+               multiprocessor = False, formatfilter = {"folders": "out_onl",
+                                                      "languages": ["de"],
+                                                      "style": "eu"
                                                       },
-               cardformat = "us"
+               cardformat = "poker"
                )
 #    make_cards(cards, use_specials = False, card_type = "air spell", clean = False,
 #               multiprocessor = True, formatfilter = {"folders": "out_onl",

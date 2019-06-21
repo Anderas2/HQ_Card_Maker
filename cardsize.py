@@ -30,7 +30,14 @@ class cardsize():
         self.vanilla = (245,236,219)
 
         self.POKERFRAME = self.TEMPLATEFOLDER + r'EU_Pokerframe.png'
-        self.NORMALFRAME = self.TEMPLATEFOLDER + r'EU_Frame.png'
+        self.NORMALFRAME = self.TEMPLATEFOLDER + r'EU_Originalframe.png'
+        self.MINIFRAME =  self.TEMPLATEFOLDER + r'EU_Miniframe.png'
+        self.SKATFRAME = self.TEMPLATEFOLDER + r'EU_Skatframe.png'
+        self.EU_USFRAME = self.TEMPLATEFOLDER + r'EU_USframe.png'
+        self.ZOMBICIDEFRAME = self.TEMPLATEFOLDER + r'EU_Zombicideframe.png'
+
+
+
         self.HEADLINE = self.TEMPLATEFOLDER + r'headline_space.png'
         self.HEADLINE_SIZE = (561, 96)
 
@@ -190,15 +197,13 @@ class cardsize():
         #out_png.paste(new_png, mask=new_png.split()[3])
         out_png.save(outfile)
 
-    def card_sizing(self, im, fmt=None):
+    def card_sizing(self, im=None, fmt=None, style = "eu"):
         '''return a darkred image having the img in exact center;
         adapted to fit images of Heroquest Cards;
         brings them to a format suitable for some Printerstudio sizes
         by adding a 70 pixel border all around. 70 pixel is 2x3mm which
         will be cut off by the professional printer'''
 
-
-        size = im.size
         frame_f = self.NORMALFRAME
         # original eu card size in mm
         x = 53.7
@@ -208,12 +213,13 @@ class cardsize():
             if fmt in ["zombicide", "44x67"]:
                 x = 44
                 y = 67
-                frame_f = self.NORMALFRAME
+                frame_f = self.ZOMBICIDEFRAME
             elif fmt == "us":
                 #56mm x 89 mm
                 x = 56
                 y = 89
-                frame_f = None
+                frame_f = self.EU_USFRAME
+                #frame_f = None
             elif (fmt == "25x35") or ("poker" in fmt.lower()):
                 '2,5 x 3,5 inch format'
                 x = 63.5
@@ -224,16 +230,32 @@ class cardsize():
             elif "mini" in fmt.lower():
                 x = 44.5
                 y = 63.5
+                frame_f = self.MINIFRAME
             elif "skat" in fmt.lower():
                 x = 59
                 y = 91
+                frame_f = self.SKATFRAME
             else:
                 # none of those special formats found, assume original cards
                 x = 53.7
                 y = 80
-        testsize = (int(x / 25.4 * 300), int(y / 25.4 * 300))
-        size = (int(x / 25.4 * 300) + 70, int(y / 25.4 * 300) + 70)
+                frame_f = self.NORMALFRAME
+        # make the size of the frame
+        size = (int(1.5 + x / 25.4 * 300) + 70, int(1.5 + y / 25.4 * 300) + 70)
+        # content has to fit in the frame, so remove frame and remove security
+        thumbsize = (size[0] - 140, size[1] - 140)
+        self.size = size
 
+        # check if the original image fits into the frame: The actual content
+        # is again 6mm x 2 = 140pixel smaller than the frame.
+        if not im:
+            # if no image was given, it is just a request for the correct size
+            return thumbsize
+
+        if (im.size[0] > size[0] - 140
+        or im.size[1] > size[1] - 140):
+            im.thumbnail(thumbsize, Image.ANTIALIAS)
+        #BASE_CARD_SIZE = (567, 995)
 
         # resize image by stuffing to the borders or crop
         im_sized = Image.new('RGBA', size, self.vanilla)
@@ -243,7 +265,7 @@ class cardsize():
         im_sized.paste(im, offset) # paste image in the middle of the new card
 
         # If a frame was chosen, apply frame.
-        if frame_f != None:
+        if frame_f != None and style == "eu":
             frame = Image.open(frame_f) #load frame
             # get sizes to paste the frame in the middle.
             f_w, f_h = frame.size

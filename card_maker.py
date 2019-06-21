@@ -201,19 +201,23 @@ def make_headline(msg, im=None, style="eu"):
     return im
 
 #%%
+
+def find_max_width(in_text, text_w_px, font):
+    text_w_px
+    text_w = font.getsize(in_text)[0]
+    overlength = round(text_w / text_w_px + 1 )
+    return len(in_text) // overlength
+
+
 def wrap_text_on_card(in_text,
                       maxwidth = 38, # text width in letters
-                      maxheight = 13, # text height in lines
-                      im_w = 567 # image width in pixel
+                      maxheight = 13 # text height in lines
                       ):
     ''' Gets a text in_text and splits it into lines to fit the defined margins
     maxwidth is the maximum number of letters per line. It will be adjusted from
     outside.
     maxheight is the maximum number of lines for this text space.
         maxheight is currently not used.
-    im_w is the number of pixels that the image is wide.
-
-
     returns a list of text lines.
     '''
     # first, split into lines by newlines coming from the text
@@ -222,10 +226,8 @@ def wrap_text_on_card(in_text,
     # now split the rest fitting to the space restrictions
     lines = []
     for line in new_msg:
-        line = textwrap.wrap(line, width=maxwidth, replace_whitespace = False)
-        lines.append(line)
-    # TODO: Textwrap does not do a good job when it comes to compare text
-    # length and image width. Correct.
+        lines.append(textwrap.wrap(line, width=int(maxwidth),
+                                   replace_whitespace = False))
 
     # special signs and newlines are not treated very well by the textwrap
     # function, so I treat them well now.
@@ -242,6 +244,53 @@ def wrap_text_on_card(in_text,
 #        messages = 'This text was too long, please edit'
     return messages
 
+def make_textparts(line, sign_colors, textcolor):
+    '''disassembles the text line, checks word by word if there is some
+    part of the text that shall have a special color as specified in sign_colors.
+    Makes a list of dicts that gives text parts and their associated colors.
+
+    The result looks like that:
+
+        [{'color': 'black', 'text': 'Lorem ipsum '},
+         {'color': (0, 0, 255), 'text': '♦'},
+         {'color': 'black', 'text': ' dolor sit amet,'}]
+
+    line: One line of text
+    sign_colors: A dict of words or signs and the color they shall have
+    textcolor: The color that all the rest of hte text shall have
+
+    '''
+    # check if colored special signs appear in the line.
+    # every text part will have a color property.
+    textparts = []
+    textparts.append ({'text': '',
+                      'color': textcolor})
+
+    if len(line)<=1: # empty line, don't do the rest.
+        textparts[-1]['text']=' '
+    else:
+        # assign colors to words, word-by-word
+        allgroups = re.split('(\s)',line) # split in words, keep separators
+        words = allgroups[0::2]
+        separators = allgroups[1::2]
+        if len(separators) < len(words):
+            separators.append('') # add one entry at the end of the list
+        for i, word in enumerate(words):
+            if word not in sign_colors.keys():
+                # standard text, just add to the last part of the standard
+                # text
+                textparts[-1]['text'] += word + separators[i]
+            else:
+                # special colored sign. Make a new text part with a special
+                # color and the sign inside, then start the next standard
+                # text part.
+                textparts.append({'text': word,
+                                  'color': sign_colors[word]})
+                textparts.append ({'text': separators[i],
+                                  'color': textcolor})
+    return textparts
+
+
 #%%
 def replace_specials(msg, signs):
     ''' unfinished function to implement the special signs of HQ Modern.
@@ -254,63 +303,53 @@ def replace_specials(msg, signs):
     return msg
 #%%
 
+
 def make_text_body(msg="Empty Card",
-              im=None,
-              textsize = None,
               textcolor='black',
-              use_specials = True,
+              textsize = None,
+              use_specials = False,
               language = 'en'):
     ''' Makes the text body for a play card.
     msg: The text that shall be on the playcard.
     im: An input image that can be used as size restriction for the text
-    textsize: instead of handing an image as size, you can hand a size tuple
-    directly with (width, height) in pixel.
     textcolor: you can define any color here. default is black.
     use_specials: shall the special signs of hq_modern be used or not.
     language: The text can be in different languages. This is important for
         the regexes that replace repeating sentences with special signs.
-
     returns: An image of the text fitting with the dimensions of the input
         image.
     '''
+    if textsize == None:
+        textsize = TEXTFRAME_SIZE
 
-    # sanity checks
-    if im == None:
-        if textsize == None:
-            im = Image.new(COLORFORMAT, TEXTFRAME_SIZE, VANILLA)
-        else:
-            im = Image.new(COLORFORMAT, textsize, VANILLA)
-
-
+    im = Image.new(COLORFORMAT, textsize, VANILLA)
     draw = ImageDraw.Draw(im)
 
-    if use_specials == True:
-        msg, sign_colors = use_specialsigns(msg, language=language)
-    else:
-        sign_colors = {'♦':(0,0,255),
-                       '♥':(255,0,0)}
-
-
+    sign_colors = {'♦':(0,0,255),
+                   '♥':(255,0,0)}
 
     # check the text size and see if it works with the im restrictions
     # if not, switch to smaller padding and/or smaller font size.
     # maxwidth = 38 for fontsize = 32
     # maxwidth = 34 for fontsize = 38
-    maxletters = [33, 38] # maxiumum number of letters per line
-    fontsizes = [38, 32] # fontsize to be used
-    pads = [8, 5, 4] # minimum distance between two lines in pixel
-    im_w, im_h = im.size
+
+    fontsizes = [38, 32] + list(range(31, 24, -1)) # fontsizes to be used
+    pads = [8, 5, 4, 2] # minimum distance between two lines in pixel
+
     for i, fontsize in enumerate(fontsizes):
-        maxwidth =  maxletters[i]
+
+
+        font = ImageFont.truetype(FONTFOLDER + "HQModern.ttf", fontsize)
+        maxwidth = find_max_width(msg, textsize[0], font)
         if language == 'de':
             # because of many CAPITAL letters in german,
             # we need to use less letters per line.
             maxwidth = maxwidth - 2
 
         for pad in pads:
-            msg_lines = wrap_text_on_card(msg, maxwidth = maxwidth, im_w = im_w)
-            font = ImageFont.truetype(FONTFOLDER + "HQModern.ttf", fontsize)
+            msg_lines = wrap_text_on_card(msg, maxwidth = maxwidth)
 
+            im_w, im_h = im.size
             line_h = 0
             for line in msg_lines:
                 t_w, t_h = draw.textsize(line, font=font) # get the height
@@ -333,33 +372,7 @@ def make_text_body(msg="Empty Card",
 
     # now, line by line, make texts
     for line in msg_lines:
-        # check if colored special signs appear in the line.
-        # every text part will have a color property.
-        textparts = []
-        textparts.append ({'text': '',
-                          'color': textcolor})
-
-        if len(line)<=1: # empty line, don't do the rest.
-            textparts[-1]['text']=' '
-        else:
-            allgroups = re.split('(\s)',line) # split in words, keep separators
-            words = allgroups[0::2]
-            separators = allgroups[1::2]
-            if len(separators) < len(words):
-                separators.append('')
-            for i, word in enumerate(words):
-                if word not in sign_colors.keys():
-                    # standard text, just add to the last part of the standard
-                    # text
-                    textparts[-1]['text'] += word + separators[i]
-                else:
-                    # special colored sign. Make a new text part with a special
-                    # color and the sign inside, then start the next standard
-                    # text part.
-                    textparts.append({'text': word,
-                                      'color': sign_colors[word]})
-                    textparts.append ({'text': separators[i],
-                                      'color': textcolor})
+        textparts = make_textparts(line, sign_colors, textcolor)
 
         # every part has it's assigned color now.
         # print it along the line, part for part
@@ -373,15 +386,18 @@ def make_text_body(msg="Empty Card",
         current_w = start_w_pos
         for textpart in textparts:
             t_w, t_h = draw.textsize(textpart['text'],
-                                 font=font)
+                                     font=font)
             draw.text((current_w, current_h),
                       textpart['text'],
                       font=font,
                       fill = textpart['color'])
-            current_w += t_w
+            current_w += t_w # move position forward to new place
 
         current_h += move_h
+
     return im
+
+
 #%%
 
 def open_image(pic_path, pic_size):
@@ -768,7 +784,7 @@ if __name__ == '__main__':
                                                       "languages": ["de"],
                                                       "style": "eu"
                                                       },
-               cardformat = "poker"
+               cardformat = "original"
                )
 #    make_cards(cards, use_specials = False, card_type = "air spell", clean = False,
 #               multiprocessor = True, formatfilter = {"folders": "out_onl",

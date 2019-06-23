@@ -107,7 +107,6 @@ def read_cards(link = None):
             language = []
             for version in language_versions:
                 # version contains "de", "en", "fr", "it" and so on
-                # TODO: change format to actual card size format
                 content = {'language': version,
                            'title': record['title_'+version],
                            'body': record['body_'+version],
@@ -203,9 +202,9 @@ def make_headline(msg, im=None, style="eu"):
 #%%
 
 def find_max_width(in_text, text_w_px, font):
-    text_w_px
+    #text_w_px
     text_w = font.getsize(in_text)[0]
-    overlength = round(text_w / text_w_px + 1 )
+    overlength = round(text_w / text_w_px + 0.5 )
     return len(in_text) // overlength
 
 
@@ -303,6 +302,46 @@ def replace_specials(msg, signs):
     return msg
 #%%
 
+def find_font(font, msg, textsize, language):
+    # check the text size and see if it works with the im restrictions
+    # if not, switch to smaller padding and/or smaller font size.
+    # maxwidth = 38 for fontsize = 32
+    # maxwidth = 34 for fontsize = 38
+
+    fontsizes = [38, 32] + list(range(31, 24, -1)) # fontsizes to be used
+    pads = [8, 5, 4, 2] # minimum distance between two lines in pixel
+    for i, fontsize in enumerate(fontsizes):
+
+        font = ImageFont.truetype(FONTFOLDER + "HQModern.ttf", fontsize)
+        maxwidth = find_max_width(msg, textsize[0], font)
+
+        if language == 'de':
+            # because of many CAPITAL letters in german,
+            # we need to use less letters per line.
+            maxwidth = maxwidth - 2
+
+        for pad in pads:
+            msg_lines = wrap_text_on_card(msg, maxwidth = maxwidth)
+
+            line_h = 0
+            for line in msg_lines:
+                t_h = font.getsize(line)[1]
+                #t_w, t_h = draw.textsize(line, font=font) # get the height
+                line_h = max(t_h, line_h)
+
+            # calculate full text height
+            # vertical movement per line
+            move_h = (line_h + pad)
+
+            # text height plus minimum distance between the lines
+            text_h = (move_h * len(msg_lines))
+            if text_h < textsize[1]:
+                break
+
+        if text_h < textsize[1]:
+            break
+
+    return font, move_h, text_h, msg_lines
 
 def make_text_body(msg="Empty Card",
               textcolor='black',
@@ -328,47 +367,13 @@ def make_text_body(msg="Empty Card",
     sign_colors = {'♦':(0,0,255),
                    '♥':(255,0,0)}
 
-    # check the text size and see if it works with the im restrictions
-    # if not, switch to smaller padding and/or smaller font size.
-    # maxwidth = 38 for fontsize = 32
-    # maxwidth = 34 for fontsize = 38
-
-    fontsizes = [38, 32] + list(range(31, 24, -1)) # fontsizes to be used
-    pads = [8, 5, 4, 2] # minimum distance between two lines in pixel
-
-    for i, fontsize in enumerate(fontsizes):
-
-
-        font = ImageFont.truetype(FONTFOLDER + "HQModern.ttf", fontsize)
-        maxwidth = find_max_width(msg, textsize[0], font)
-        if language == 'de':
-            # because of many CAPITAL letters in german,
-            # we need to use less letters per line.
-            maxwidth = maxwidth - 2
-
-        for pad in pads:
-            msg_lines = wrap_text_on_card(msg, maxwidth = maxwidth)
-
-            im_w, im_h = im.size
-            line_h = 0
-            for line in msg_lines:
-                t_w, t_h = draw.textsize(line, font=font) # get the height
-                line_h = max(t_h, line_h)
-
-            # calculate full text height
-            # vertical movement per line
-            move_h = (line_h + pad)
-
-            # text height plus minimum distance between the lines
-            text_h = (move_h * len(msg_lines))
-            if text_h < im_h:
-                break
-
-        if text_h < im_h:
-            break
+    font, move_h, text_h, msg_lines = find_font(font=FONTFOLDER + "HQModern.ttf",
+                                                msg = msg,
+                                                textsize = textsize,
+                                                language = language)
 
     # Make vertically centered starting position
-    current_h = (im_h - text_h) // 2
+    current_h = (textsize[1] - text_h) // 2
 
     # now, line by line, make texts
     for line in msg_lines:
@@ -381,7 +386,7 @@ def make_text_body(msg="Empty Card",
 
         # determine start for horizontally centered text
         t_w, t_h = draw.textsize(line, font=font)
-        start_w_pos = (im_w - t_w) // 2
+        start_w_pos = (textsize[0] - t_w) // 2
 
         current_w = start_w_pos
         for textpart in textparts:
@@ -482,6 +487,9 @@ def make_base_card(card, style = "eu", cardsize = None, use_specials=True):
 
     else:
         textsize = TEXTFRAME_SIZE
+
+
+
 
     im_head = make_headline(card['title'], style = style)
     im_pic = make_picture(card["pic_path"])
@@ -599,7 +607,14 @@ def make_card_list(cards, use_specials = True, card_type = 'all', clean = True, 
                         nr = str(int(card['No']))
                     else:
                         nr = str(card['No'])
-                    this_card['name'] = nr + ' ' + language['title'] + ' ' + card['tags']
+                    this_card['name'] = (nr + ' ' + language['title'] + ' ' + card['tags']) \
+                                        .replace("ä", "ae") \
+                                        .replace("ö", "oe") \
+                                        .replace("ü", "ue") \
+                                        .replace("Ä", "Ae") \
+                                        .replace("Ö", "Oe") \
+                                        .replace("Ü", "Ue")
+                    this_card['name'] = re.sub(r'[^a-zA-Z0-9\s]','', this_card['name'])
                     this_card['out_base'] = OUTPATH_BASE + style + '_' + language['language'] + '\\'
                     this_card['out_phon'] = this_card['out_base'] + OUTPATH_PHONE + card['back'] + '\\' +  this_card['name'] + '.jpg'
                     this_card['out_onl'] = this_card['out_base'] + OUTPATH_ONLINE + card['back'] + '\\' + this_card['name'] + '.jpg'
@@ -780,22 +795,13 @@ if __name__ == '__main__':
         ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"] '''
     #make_cards(cards, use_specials = False, card_type = "potion")
     make_cards(cards, use_specials = False, card_type = "dungeonsdark", clean = False,
-               multiprocessor = False, formatfilter = {"folders": "out_onl",
+               multiprocessor = True, formatfilter = {"folders": "out_onl",
                                                       "languages": ["de"],
                                                       "style": "eu"
                                                       },
-               cardformat = "original"
+               cardformat = "us"
                )
-#    make_cards(cards, use_specials = False, card_type = "air spell", clean = False,
-#               multiprocessor = True, formatfilter = {"folders": "out_onl",
-#                                                      "languages": ["de"],
-#                                                      "style": "eu"
-#                                                      }
-#               )
 
-    #make_cards(cards, use_specials = False, card_type = "change", clean = False)
-    #make_cards(cards, use_specials = False, card_type = "treasure")
-    #make_cards(cards, use_specials = False, card_type = "all")
 
 
     #make_preview(OUTPATH_BASE + 'eu_en\\' + OUTPATH_PHONE)

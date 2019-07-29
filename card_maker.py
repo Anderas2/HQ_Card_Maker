@@ -594,7 +594,9 @@ def make_card_list(cards, use_specials = True, card_type = 'all', clean = True, 
         for language in card['language']:
             for style in language['style']:
                 if (card_type == 'all'
-                or card_type.lower() in card['tags'].lower()):
+                or any(card_type.lower() in item for item in card['tags'].lower())
+                or card_type.lower() in card['tags'].lower()
+                ):
                     this_card = {}
                     this_card['use_specials'] = use_specials
                     this_card['style'] = style
@@ -794,12 +796,12 @@ if __name__ == '__main__':
     cardformat can be one of these:
         ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"] '''
     #make_cards(cards, use_specials = False, card_type = "potion")
-    make_cards(cards, use_specials = False, card_type = "dungeonsdark", clean = False,
-               multiprocessor = True, formatfilter = {"folders": "out_onl",
-                                                      "languages": ["de"],
+    make_cards(cards, use_specials = False, card_type = "all", clean = False,
+               multiprocessor = True, formatfilter = {"folders": "out_print",
+                                                      "languages": ["en"],
                                                       "style": "eu"
                                                       },
-               cardformat = "us"
+               cardformat = "poker"
                )
 
 

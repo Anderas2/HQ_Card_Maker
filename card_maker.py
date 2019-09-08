@@ -586,7 +586,7 @@ def make_folders(card_list):
     for folder in folders:
         make_folder(folder)
 
-def make_card_list(cards, use_specials = True, card_type = 'all', clean = True, cardformat = "eu"):
+def make_card_list(cards, use_specials = True, card_type = 'all', clean = True, cardformat = "original"):
 
     card_list = []
     # make list of cards in simplified format. One list entry = one card
@@ -797,11 +797,12 @@ if __name__ == '__main__':
         ["zombicide", "44x67", "poker", "25x35","us", "mini", "skat", "eu", "original"] '''
     #make_cards(cards, use_specials = False, card_type = "potion")
     make_cards(cards, use_specials = False, card_type = "all", clean = False,
-               multiprocessor = True, formatfilter = {"folders": "out_print",
+               multiprocessor = True, formatfilter = {"folders": "out_onl",
                                                       "languages": ["en"],
+                                                      "card_backs":["artifact"],
                                                       "style": "eu"
                                                       },
-               cardformat = "poker"
+               cardformat = "original"
                )
 
 
